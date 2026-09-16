@@ -1,0 +1,524 @@
+--========================================================--
+--                     ZpeKeno Hub                        --
+--                   Pure Lua / LÖVE2D                    --
+--========================================================--
+
+-- 注意：此脚本需要 LÖVE2D 框架运行
+-- 需要以下前置模块（见文件底部）
+
+local Player = {
+    Position = {x = 0, y = 0},
+    Character = nil,
+    Health = 100
+}
+
+--========================================================--
+-- CONFIG
+--========================================================--
+
+local Config = {
+    AimAssist = false,
+    AimDistance = 500,
+    Prediction = 25,
+
+    ESP = false,
+    ShowHealth = true,
+    ShowDistance = true,
+
+    Dash = false,
+    DashDistance = 20,
+
+    Speed = false,
+    SpeedValue = 16,
+
+    Jump = false,
+    JumpValue = 50
+}
+
+--========================================================--
+-- GUI STATE
+--========================================================--
+
+local Gui = {
+    visible = true,
+    elements = {},
+    scale = 1
+}
+
+local IsOpen = true
+
+--========================================================--
+-- HELPER: 创建 UI 元素
+--========================================================--
+
+local function CreateElement(props)
+    local element = {}
+    for k, v in pairs(props) do
+        element[k] = v
+    end
+    element.visible = true
+    
+    if element.type == "toggle" then
+        element.state = element.state or false
+        element.callback = element.callback or function() end
+    elseif element.type == "slider" then
+        element.value = element.value or 0
+        element.min = element.min or 0
+        element.max = element.max or 100
+        element.callback = element.callback or function() end
+        element.dragging = false
+    elseif element.type == "button" then
+        element.callback = element.callback or function() end
+    end
+    
+    table.insert(Gui.elements, element)
+    return element
+end
+
+--========================================================--
+-- RESPONSIVE
+--========================================================--
+
+local function UpdateScale()
+    local windowWidth, windowHeight = love.graphics.getDimensions()
+    
+    local WidthScale = windowWidth / 700
+    local HeightScale = windowHeight / 520
+    
+    local NewScale = math.min(WidthScale, HeightScale)
+    NewScale = math.clamp(NewScale, 0.72, 1)
+    
+    Gui.scale = NewScale
+end
+
+--========================================================--
+-- DRAW: 主面板
+--========================================================--
+
+local function DrawMainPanel()
+    if not Gui.visible then return end
+    
+    local sx, sy = love.graphics.getDimensions()
+    local panelW, panelH = 650 * Gui.scale, 470 * Gui.scale
+    local px = (sx - panelW) / 2
+    local py = (sy - panelH) / 2
+    
+    -- 主背景
+    love.graphics.setColor(9/255, 12/255, 18/255, 1)
+    love.graphics.rectangle("fill", px, py, panelW, panelH, 15)
+    
+    -- 边框
+    love.graphics.setColor(80/255, 165/255, 255/255, 0.8)
+    love.graphics.setLineWidth(1.5)
+    love.graphics.rectangle("line", px, py, panelW, panelH, 15)
+    
+    -- 标题
+    love.graphics.setColor(245/255, 248/255, 255/255, 1)
+    love.graphics.print("ZpeKeno", px + 60 * Gui.scale, py + 12 * Gui.scale)
+    
+    love.graphics.setColor(110/255, 125/255, 145/255, 1)
+    love.graphics.print("GAME DEVELOPMENT HUB", px + 62 * Gui.scale, py + 45 * Gui.scale)
+    
+    -- 关闭按钮
+    love.graphics.setColor(23/255, 28/255, 37/255, 1)
+    love.graphics.rectangle("fill", px + panelW - 44 * Gui.scale, py + 12 * Gui.scale, 
+        34 * Gui.scale, 34 * Gui.scale, 8)
+    love.graphics.setColor(230/255, 235/255, 245/255, 1)
+    love.graphics.print("×", px + panelW - 36 * Gui.scale, py + 14 * Gui.scale)
+end
+
+--========================================================--
+-- DRAW: 浮动按钮
+--========================================================--
+
+local function DrawFloatingButton()
+    local x, y = 14 * Gui.scale, 14 * Gui.scale
+    local size = 58 * Gui.scale
+    
+    love.graphics.setColor(9/255, 12/255, 18/255, 1)
+    love.graphics.rectangle("fill", x, y, size, size, 13)
+    
+    love.graphics.setColor(80/255, 165/255, 255/255, 1)
+    love.graphics.setLineWidth(1.5)
+    love.graphics.rectangle("line", x, y, size, size, 13)
+    
+    love.graphics.setColor(245/255, 248/255, 255/255, 1)
+    love.graphics.printf("Z", x, y + size/4, size, "center")
+end
+
+--========================================================--
+-- CLEAR CONTENT
+--========================================================--
+
+local function ClearContent()
+    for i = #Gui.elements, 1, -1 do
+        if Gui.elements[i].inContent then
+            table.remove(Gui.elements, i)
+        end
+    end
+end
+
+--========================================================--
+-- SECTION
+--========================================================--
+
+local function Section(TitleText, Description)
+    CreateElement({
+        type = "section",
+        title = TitleText,
+        description = Description,
+        inContent = true,
+        y = #Gui.elements * 62
+    })
+end
+
+--========================================================--
+-- TOGGLE
+--========================================================--
+
+local function Toggle(Text, State, Callback)
+    local element = CreateElement({
+        type = "toggle",
+        text = Text,
+        state = State,
+        callback = Callback,
+        inContent = true,
+        y = #Gui.elements * 52
+    })
+    return element
+end
+
+--========================================================--
+-- SLIDER
+--========================================================--
+
+local function Slider(Text, Minimum, Maximum, Current, Callback)
+    local element = CreateElement({
+        type = "slider",
+        text = Text,
+        min = Minimum,
+        max = Maximum,
+        value = Current,
+        callback = Callback,
+        inContent = true,
+        y = #Gui.elements * 77
+    })
+    element.callback(math.floor(Current))
+    return element
+end
+
+--========================================================--
+-- AIMBOT PAGE
+--========================================================--
+
+local function ShowAimbot()
+    ClearContent()
+    
+    Section("AIMBOT", "Target assistance for your own game")
+    
+    Toggle("Target Assist", Config.AimAssist, function(v)
+        Config.AimAssist = v
+    end)
+    
+    Slider("Target Distance", 100, 1000, Config.AimDistance, function(v)
+        Config.AimDistance = v
+    end)
+    
+    Slider("Prediction", 1, 100, Config.Prediction, function(v)
+        Config.Prediction = v
+    end)
+end
+
+--========================================================--
+-- VISUAL PAGE
+--========================================================--
+
+local function ShowVisual()
+    ClearContent()
+    
+    Section("VISUAL", "Player information and highlighting")
+    
+    Toggle("Player Outline", Config.ESP, function(v)
+        Config.ESP = v
+    end)
+    
+    Toggle("Health %", Config.ShowHealth, function(v)
+        Config.ShowHealth = v
+    end)
+    
+    Toggle("Distance", Config.ShowDistance, function(v)
+        Config.ShowDistance = v
+    end)
+end
+
+--========================================================--
+-- OTHER PAGE
+--========================================================--
+
+local function ShowOther()
+    ClearContent()
+    
+    Section("OTHER", "Character and movement settings")
+    
+    Toggle("Dash", Config.Dash, function(v)
+        Config.Dash = v
+    end)
+    
+    Slider("Dash Distance", 5, 50, Config.DashDistance, function(v)
+        Config.DashDistance = v
+    end)
+    
+    Toggle("Movement Speed", Config.Speed, function(v)
+        Config.Speed = v
+    end)
+    
+    Slider("Movement Speed", 5, 100, Config.SpeedValue, function(v)
+        Config.SpeedValue = v
+    end)
+    
+    Toggle("Jump Height", Config.Jump, function(v)
+        Config.Jump = v
+    end)
+    
+    Slider("Jump Height", 5, 50, Config.JumpValue, function(v)
+        Config.JumpValue = v
+    end)
+end
+
+--========================================================--
+-- CHARACTER SETTINGS
+--========================================================--
+
+local function UpdateCharacter()
+    if Config.Speed then
+        -- 设置角色移动速度
+        Player.Speed = Config.SpeedValue
+    else
+        Player.Speed = 16
+    end
+    
+    if Config.Jump then
+        Player.JumpPower = Config.JumpValue
+    else
+        Player.JumpPower = 50
+    end
+end
+
+--========================================================--
+-- TARGET ASSIST
+--========================================================--
+
+local function GetNearestEnemy()
+    -- 需要根据具体游戏实现
+    return nil
+end
+
+--========================================================--
+-- MAIN LOOP (LÖVE2D 回调)
+--========================================================--
+
+function love.load()
+    UpdateScale()
+    
+    -- 默认显示 Aimbot 页面
+    ShowAimbot()
+end
+
+function love.update(dt)
+    -- 更新角色状态
+    if love.keyboard.isDown("space") then
+        -- 跳跃逻辑
+    end
+    
+    -- 速度/跳跃应用
+    if Config.Speed or Config.Jump then
+        UpdateCharacter()
+    end
+    
+    -- Aim Assist 逻辑
+    if Config.AimAssist then
+        local target = GetNearestEnemy()
+        if target then
+            -- 瞄准逻辑
+        end
+    end
+end
+
+function love.draw()
+    -- 绘制背景
+    love.graphics.clear(9/255, 12/255, 18/255)
+    
+    -- 绘制浮动按钮
+    DrawFloatingButton()
+    
+    -- 绘制主面板
+    DrawMainPanel()
+    
+    -- 绘制内容
+    if Gui.visible then
+        local sx, sy = love.graphics.getDimensions()
+        local px = (sx - 650 * Gui.scale) / 2
+        local py = (sy - 470 * Gui.scale) / 2
+        
+        for _, element in ipairs(Gui.elements) do
+            if element.inContent and element.visible then
+                local ey = py + 130 * Gui.scale + element.y * Gui.scale
+                local ew = 620 * Gui.scale
+                
+                if element.type == "section" then
+                    love.graphics.setColor(15/255, 19/255, 26/255, 1)
+                    love.graphics.rectangle("fill", px + 15 * Gui.scale, ey, ew, 55 * Gui.scale, 8)
+                    
+                    love.graphics.setColor(240/255, 245/255, 255/255, 1)
+                    love.graphics.print(element.title, px + 25 * Gui.scale, ey + 5 * Gui.scale)
+                    
+                    love.graphics.setColor(110/255, 125/255, 145/255, 1)
+                    love.graphics.print(element.description, px + 25 * Gui.scale, ey + 33 * Gui.scale)
+                    
+                elseif element.type == "toggle" then
+                    love.graphics.setColor(16/255, 20/255, 27/255, 1)
+                    love.graphics.rectangle("fill", px + 15 * Gui.scale, ey, ew, 45 * Gui.scale, 8)
+                    
+                    love.graphics.setColor(225/255, 230/255, 240/255, 1)
+                    love.graphics.print(element.text, px + 29 * Gui.scale, ey + 10 * Gui.scale)
+                    
+                    -- 开关
+                    local switchX = px + ew + 15 * Gui.scale - 54 * Gui.scale
+                    local switchY = ey + 12 * Gui.scale
+                    
+                    if element.state then
+                        love.graphics.setColor(70/255, 160/255, 255/255, 1)
+                    else
+                        love.graphics.setColor(50/255, 59/255, 72/255, 1)
+                    end
+                    love.graphics.rectangle("fill", switchX, switchY, 40 * Gui.scale, 20 * Gui.scale, 10)
+                    
+                    -- 圆点
+                    local dotX = element.state and (switchX + 23 * Gui.scale) or (switchX + 3 * Gui.scale)
+                    love.graphics.setColor(255/255, 255/255, 255/255, 1)
+                    love.graphics.circle("fill", dotX + 7 * Gui.scale, switchY + 10 * Gui.scale, 7 * Gui.scale)
+                    
+                elseif element.type == "slider" then
+                    love.graphics.setColor(16/255, 20/255, 27/255, 1)
+                    love.graphics.rectangle("fill", px + 15 * Gui.scale, ey, ew, 70 * Gui.scale, 8)
+                    
+                    love.graphics.setColor(225/255, 230/255, 240/255, 1)
+                    love.graphics.print(element.text, px + 29 * Gui.scale, ey + 6 * Gui.scale)
+                    
+                    love.graphics.setColor(100/255, 180/255, 255/255, 1)
+                    love.graphics.print(tostring(math.floor(element.value)), 
+                        px + ew + 15 * Gui.scale - 100 * Gui.scale, ey + 6 * Gui.scale)
+                    
+                    -- 进度条
+                    local barX = px + 29 * Gui.scale
+                    local barY = ey + 44 * Gui.scale
+                    local barW = ew - 28 * Gui.scale
+                    
+                    love.graphics.setColor(45/255, 53/255, 65/255, 1)
+                    love.graphics.rectangle("fill", barX, barY, barW, 5 * Gui.scale, 2.5)
+                    
+                    local percentage = (element.value - element.min) / (element.max - element.min)
+                    love.graphics.setColor(90/255, 175/255, 255/255, 1)
+                    love.graphics.rectangle("fill", barX, barY, barW * percentage, 5 * Gui.scale, 2.5)
+                end
+            end
+        end
+    end
+end
+
+--========================================================--
+-- 输入处理
+--========================================================--
+
+function love.mousepressed(x, y, button)
+    if button ~= 1 then return end
+    
+    local sx, sy = love.graphics.getDimensions()
+    local px = (sx - 650 * Gui.scale) / 2
+    local py = (sy - 470 * Gui.scale) / 2
+    
+    -- 浮动按钮
+    local btnX, btnY = 14 * Gui.scale, 14 * Gui.scale
+    if x >= btnX and x <= btnX + 58 * Gui.scale and
+       y >= btnY and y <= btnY + 58 * Gui.scale then
+        Gui.visible = not Gui.visible
+        return
+    end
+    
+    if not Gui.visible then return end
+    
+    -- 关闭按钮
+    if x >= px + 650 * Gui.scale - 44 * Gui.scale and
+       x <= px + 650 * Gui.scale - 10 * Gui.scale and
+       y >= py + 12 * Gui.scale and
+       y <= py + 46 * Gui.scale then
+        Gui.visible = false
+        return
+    end
+    
+    -- 遍历元素
+    for _, element in ipairs(Gui.elements) do
+        if element.inContent and element.visible then
+            local ey = py + 130 * Gui.scale + element.y * Gui.scale
+            local ew = 620 * Gui.scale
+            
+            if element.type == "toggle" then
+                if x >= px + 15 * Gui.scale and x <= px + 15 * Gui.scale + ew and
+                   y >= ey and y <= ey + 45 * Gui.scale then
+                    element.state = not element.state
+                    element.callback(element.state)
+                    return
+                end
+            elseif element.type == "slider" then
+                local barX = px + 29 * Gui.scale
+                local barY = ey + 44 * Gui.scale
+                local barW = ew - 28 * Gui.scale
+                
+                if x >= barX and x <= barX + barW and
+                   y >= barY - 5 and y <= barY + 10 * Gui.scale then
+                    element.dragging = true
+                    local percentage = math.clamp((x - barX) / barW, 0, 1)
+                    element.value = element.min + (element.max - element.min) * percentage
+                    element.callback(math.floor(element.value))
+                    return
+                end
+            end
+        end
+    end
+end
+
+function love.mousereleased(x, y, button)
+    if button ~= 1 then return end
+    
+    for _, element in ipairs(Gui.elements) do
+        if element.type == "slider" then
+            element.dragging = false
+        end
+    end
+end
+
+function love.mousemoved(x, y, dx, dy)
+    for _, element in ipairs(Gui.elements) do
+        if element.type == "slider" and element.dragging then
+            local sx, sy = love.graphics.getDimensions()
+            local px = (sx - 650 * Gui.scale) / 2
+            local ew = 620 * Gui.scale
+            local barX = px + 29 * Gui.scale
+            local barW = ew - 28 * Gui.scale
+            
+            local percentage = math.clamp((x - barX) / barW, 0, 1)
+            element.value = element.min + (element.max - element.min) * percentage
+            element.callback(math.floor(element.value))
+        end
+    end
+end
+
+function love.resize(w, h)
+    UpdateScale()
+end
+
+function love.keypressed(key)
+    if key == "escape" then
+        Gui.visible = not Gui.visible
+    end
+end
