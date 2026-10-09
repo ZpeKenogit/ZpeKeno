@@ -1,0 +1,719 @@
+--[[
+    ███████╗██████╗ ███████╗██╗  ██╗███████╗███╗   ██╗ ██████╗ 
+    ╚══███╔╝██╔══██╗██╔════╝██║ ██╔╝██╔════╝████╗  ██║██╔═══██╗
+      ███╔╝ ██████╔╝█████╗  █████╔╝ █████╗  ██╔██╗ ██║██║   ██║
+     ███╔╝  ██╔═══╝ ██╔══╝  ██╔═██╗ ██╔══╝  ██║╚██╗██║██║   ██║
+    ███████╗██║     ███████╗██║  ██╗███████╗██║ ╚████║╚██████╔╝
+    ╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝ ╚═════╝ 
+
+    ZpeKeno — Game Development Hub
+    Better Tools / Bigger Ideas
+    Version: 1.2.0
+    Sea IDs: First / Second / Third
+]]
+
+--==============================================================
+-- CONFIG
+--==============================================================
+local Config = {}
+Config.Version = "1.2.0"
+
+Config.Settings = {
+    Aimbot = {
+        TargetAssist = false,
+        TargetDistance = { min = 100, max = 1000 },
+        Prediction = 50,
+        TeamFilter = true,
+        Smoothness = 0.15,
+    },
+    Visual = {
+        PlayerOutline = true,
+        HealthPercent = true,
+        Distance = true,
+        ExcludeLocal = true,
+        OutlineColor = Color3.fromRGB(0, 255, 0),
+    },
+    Other = {
+        Dash = 20,
+        DashEnabled = true,
+        MovementSpeed = 16,
+        JumpHeight = 50,
+    },
+    Bypass = {
+        RealSpeed = 50,
+        FakeSpeed = 16,
+        TeleportSteps = 10,
+        TeleportDuration = 0.15,
+    },
+}
+
+Config.SeaIDs = {
+    First = {
+        name = "First Sea",
+        levels = { min = 1, max = 700 },
+        islands = {
+            ["Starter Island"] = 1, ["Marine Ford"] = 2, ["Shell Town"] = 3,
+            ["Foosha Village"] = 4, ["Orange Town"] = 5, ["Baratie"] = 6,
+            ["Arlong Park"] = 7, ["Loguetown"] = 8, ["Reverse Mountain"] = 9,
+            ["Whiskey Peak"] = 10, ["Little Garden"] = 11, ["Drum Island"] = 12,
+            ["Alabasta"] = 13, ["Jaya"] = 14, ["Skypiea"] = 15,
+            ["Long Ring Long Land"] = 16, ["Water 7"] = 17, ["Enies Lobby"] = 18,
+            ["Thriller Bark"] = 19, ["Sabaody Archipelago"] = 20, ["Amazon Lily"] = 21,
+            ["Impel Down"] = 22, ["Marineford War"] = 23,
+        },
+        mobIDs = {
+            ["Bandit"] = 1, ["Rebel Soldier"] = 2, ["Knife Bandit"] = 3,
+            ["Monkey"] = 4, ["Pirate"] = 5, ["Marine"] = 6,
+            ["Fishman"] = 7, ["Giant"] = 8, ["Zombie"] = 9, ["Vice Admiral"] = 10,
+        },
+    },
+    Second = {
+        name = "Second Sea",
+        levels = { min = 700, max = 1500 },
+        islands = {
+            ["Kingdom of Rose"] = 24, ["Green Zone"] = 25, ["Graveyard"] = 26,
+            ["Snow Mountain"] = 27, ["Ice Castle"] = 28, ["Forgotten Island"] = 29,
+            ["Cursed Ship"] = 30, ["Haunted Castle"] = 31, ["Sea of Treats"] = 32,
+            ["Cake Island"] = 33, ["Candy Island"] = 34, ["Prison"] = 35, ["Marine HQ"] = 36,
+        },
+        mobIDs = {
+            ["Raider"] = 11, ["Mercenary"] = 12, ["Snow Bandit"] = 13,
+            ["Ice Marine"] = 14, ["Ghost"] = 15, ["Candy Pirate"] = 16,
+            ["Cake Guard"] = 17, ["Prison Guard"] = 18, ["Vice Admiral II"] = 19,
+            ["Cursed Captain"] = 20,
+        },
+    },
+    Third = {
+        name = "Third Sea",
+        levels = { min = 1500, max = 2550 },
+        islands = {
+            ["Port Town"] = 37, ["Hydra Island"] = 38, ["Great Tree"] = 39,
+            ["Castle on the Sea"] = 40, ["Floating Turtle"] = 41, ["Haunted Castle III"] = 42,
+            ["Sea of Treats III"] = 43, ["Kingdom of Rose III"] = 44, ["Cursed Ship III"] = 45,
+            ["Ice Castle III"] = 46, ["Forgotten Island III"] = 47, ["Mansion"] = 48,
+            ["Tiki Outpost"] = 49, ["Sea Beast Island"] = 50,
+        },
+        mobIDs = {
+            ["Pirate III"] = 21, ["Sea Beast"] = 22, ["Turtle Soldier"] = 23,
+            ["Castle Guard"] = 24, ["Ghost III"] = 25, ["Candy Pirate III"] = 26,
+            ["Cake Guard III"] = 27, ["Prison Guard III"] = 28, ["Vice Admiral III"] = 29,
+            ["Cursed Captain III"] = 30, ["Tiki Warrior"] = 31, ["Mansion Guard"] = 32,
+        },
+    },
+}
+
+--==============================================================
+-- BYPASS
+--==============================================================
+local Bypass = {}
+
+local function hookNamecall(targetRemote, blockFire)
+    local mt = getrawmetatable(targetRemote)
+    if not mt then return end
+    local old = mt.__namecall
+    if not old then return end
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if self == targetRemote and blockFire and (method == "FireServer" or method == "InvokeServer") then
+            return nil
+        end
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+end
+
+function Bypass.BlockTelemetry()
+    local blocked = {
+        "SendTelemetry", "LogAction", "AntiCheatReport",
+        "ReportPlayer", "CheckSpeed", "CheckPosition",
+        "VerifyCharacter", "HeartbeatCheck",
+    }
+    for _, remote in pairs(game:GetDescendants()) do
+        if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+            for _, b in pairs(blocked) do
+                if remote.Name:lower():find(b:lower()) then
+                    pcall(hookNamecall, remote, true)
+                end
+            end
+        end
+    end
+    print("[Zpekeno] Telemetria bloqueada.")
+end
+
+function Bypass.SpeedSpoof(realSpeed, fakeSpeed)
+    realSpeed = realSpeed or 16
+    fakeSpeed = fakeSpeed or 16
+    local plr = game.Players.LocalPlayer
+    local char = plr.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    local mt = getrawmetatable(game)
+    if not mt then return end
+    local oldIndex = mt.__index
+    local oldNewIndex = mt.__newindex
+    setreadonly(mt, false)
+
+    mt.__index = newcclosure(function(self, key)
+        if self == hum and key == "WalkSpeed" then return fakeSpeed end
+        return oldIndex(self, key)
+    end)
+    mt.__newindex = newcclosure(function(self, key, value)
+        if self == hum and key == "WalkSpeed" then
+            oldNewIndex(self, key, realSpeed)
+            return
+        end
+        return oldNewIndex(self, key, value)
+    end)
+    setreadonly(mt, true)
+
+    hum.WalkSpeed = realSpeed
+    print("[Zpekeno] Speed spoof:", realSpeed, "->", fakeSpeed)
+end
+
+function Bypass.SafeTeleport(targetCFrame, steps, duration)
+    steps = steps or 10
+    duration = duration or 0.15
+    local plr = game.Players.LocalPlayer
+    local char = plr.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local start = root.CFrame
+    for i = 1, steps do
+        local a = i / steps
+        root.CFrame = start:Lerp(targetCFrame, a)
+        task.wait(duration / steps)
+    end
+end
+
+function Bypass.SafeDash(direction, speed)
+    local plr = game.Players.LocalPlayer
+    local char = plr.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(1e5, 0, 1e5)
+    bv.Velocity = direction * speed
+    bv.Name = "Velocity"
+    bv.Parent = root
+    task.wait(0.15)
+    if bv and bv.Parent then bv:Destroy() end
+end
+
+function Bypass.CleanClientChecks()
+    pcall(function()
+        local env = getfenv(0)
+        local keys = {}
+        for k in pairs(env) do
+            local s = tostring(k):lower()
+            if s:find("anticheat") or s:find("detection") or s:find("bfcheck") then
+                table.insert(keys, k)
+            end
+        end
+        for _, k in pairs(keys) do env[k] = nil end
+    end)
+    print("[Zpekeno] Client checks limpos.")
+end
+
+function Bypass.ProtectExecutor()
+    pcall(function()
+        local env = getfenv(0)
+        env.getgenv = nil
+        env.getrawmetatable = nil
+        env.setreadonly = nil
+        env.newcclosure = nil
+    end)
+end
+
+function Bypass.Init(settings)
+    settings = settings or {}
+    Bypass.BlockTelemetry()
+    Bypass.CleanClientChecks()
+    Bypass.ProtectExecutor()
+    Bypass.SpeedSpoof(settings.RealSpeed or 50, settings.FakeSpeed or 16)
+    print("[Zpekeno] Bypass carregado.")
+end
+
+--==============================================================
+-- SEA DETECTION
+--==============================================================
+local Sea = {}
+
+function Sea.GetCurrentSea()
+    local plr = game.Players.LocalPlayer
+    if not plr then return nil end
+    local ok, data = pcall(function() return plr.Data.Level.Value end)
+    local level = ok and data or 1
+    if level >= 1500 then return "Third" end
+    if level >= 700 then return "Second" end
+    return "First"
+end
+
+function Sea.GetIslandID(name)
+    local sea = Sea.GetCurrentSea()
+    if not sea then return nil end
+    local data = Config.SeaIDs[sea]
+    for n, id in pairs(data.islands) do
+        if n:lower():find(name:lower()) then return id, n end
+    end
+    return nil
+end
+
+function Sea.GetMobID(name)
+    local sea = Sea.GetCurrentSea()
+    if not sea then return nil end
+    local data = Config.SeaIDs[sea]
+    for n, id in pairs(data.mobIDs) do
+        if n:lower():find(name:lower()) then return id, n end
+    end
+    return nil
+end
+
+function Sea.GetAllIslands()
+    local sea = Sea.GetCurrentSea()
+    if not sea then return {} end
+    return Config.SeaIDs[sea].islands
+end
+
+function Sea.GetAllMobs()
+    local sea = Sea.GetCurrentSea()
+    if not sea then return {} end
+    return Config.SeaIDs[sea].mobIDs
+end
+
+function Sea.GetLevelRange()
+    local sea = Sea.GetCurrentSea()
+    if not sea then return nil end
+    return Config.SeaIDs[sea].levels
+end
+
+--==============================================================
+-- VISUAL (ESP)
+--==============================================================
+local Visual = {}
+local drawings = {}
+
+function Visual.CreateESP(target)
+    local plr = game.Players.LocalPlayer
+    if target == plr and Config.Settings.Visual.ExcludeLocal then return end
+    if drawings[target] then return end
+    local char = target.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "Zpekeno_ESP"
+    billboard.Size = UDim2.new(0, 200, 0, 100)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Adornee = root
+    billboard.Parent = root
+
+    if Config.Settings.Visual.PlayerOutline then
+        local hl = Instance.new("Highlight")
+        hl.Name = "SelectionBox"
+        hl.FillColor = Config.Settings.Visual.OutlineColor
+        hl.OutlineColor = Config.Settings.Visual.OutlineColor
+        hl.FillTransparency = 0.7
+        hl.OutlineTransparency = 0
+        hl.Parent = char
+    end
+
+    if Config.Settings.Visual.HealthPercent then
+        local lbl = Instance.new("TextLabel")
+        lbl.Name = "Health"
+        lbl.Size = UDim2.new(1, 0, 0.3, 0)
+        lbl.Position = UDim2.new(0, 0, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        lbl.TextStrokeTransparency = 0
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextScaled = true
+        lbl.Text = "100%"
+        lbl.Parent = billboard
+    end
+
+    if Config.Settings.Visual.Distance then
+        local lbl = Instance.new("TextLabel")
+        lbl.Name = "Distance"
+        lbl.Size = UDim2.new(1, 0, 0.3, 0)
+        lbl.Position = UDim2.new(0, 0, 0.3, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.TextColor3 = Color3.fromRGB(255, 255, 0)
+        lbl.TextStrokeTransparency = 0
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextScaled = true
+        lbl.Text = "0m"
+        lbl.Parent = billboard
+    end
+
+    drawings[target] = billboard
+end
+
+function Visual.RemoveESP(target)
+    if drawings[target] then
+        drawings[target]:Destroy()
+        drawings[target] = nil
+    end
+    local char = target.Character
+    if char then
+        local h = char:FindFirstChild("SelectionBox")
+        if h then h:Destroy() end
+    end
+end
+
+function Visual.Update()
+    local plr = game.Players.LocalPlayer
+    local char = plr.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    for target, gui in pairs(drawings) do
+        local tchar = target.Character
+        if not tchar then
+            Visual.RemoveESP(target)
+        else
+            local troot = tchar:FindFirstChild("HumanoidRootPart")
+            local thum = tchar:FindFirstChildOfClass("Humanoid")
+            if not troot or not thum then
+                Visual.RemoveESP(target)
+            else
+                local dist = (troot.Position - root.Position).Magnitude
+                if Config.Settings.Visual.HealthPercent then
+                    local hp = gui:FindFirstChild("Health")
+                    if hp then hp.Text = math.floor((thum.Health / thum.MaxHealth) * 100) .. "%" end
+                end
+                if Config.Settings.Visual.Distance then
+                    local dl = gui:FindFirstChild("Distance")
+                    if dl then dl.Text = math.floor(dist) .. "m" end
+                end
+            end
+        end
+    end
+end
+
+function Visual.StartLoop()
+    task.spawn(function()
+        while task.wait(0.1) do Visual.Update() end
+    end)
+end
+
+function Visual.RefreshAll()
+    for _, plr in pairs(game.Players:GetPlayers()) do
+        if plr ~= game.Players.LocalPlayer then Visual.CreateESP(plr) end
+    end
+end
+
+--==============================================================
+-- AIMBOT
+--==============================================================
+local Aimbot = {}
+local currentTarget = nil
+
+function Aimbot.GetClosestTarget()
+    local plr = game.Players.LocalPlayer
+    local char = plr.Character
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+
+    local closest, minDist = nil, Config.Settings.Aimbot.TargetDistance.max
+    for _, target in pairs(game.Players:GetPlayers()) do
+        if target == plr then continue end
+        if Config.Settings.Aimbot.TeamFilter and target.Team == plr.Team then continue end
+        local tc = target.Character
+        if tc then
+            local tr = tc:FindFirstChild("HumanoidRootPart")
+            local th = tc:FindFirstChildOfClass("Humanoid")
+            if tr and th and th.Health > 0 then
+                local d = (tr.Position - root.Position).Magnitude
+                if d >= Config.Settings.Aimbot.TargetDistance.min and d < minDist then
+                    minDist = d
+                    closest = target
+                end
+            end
+        end
+    end
+    return closest
+end
+
+function Aimbot.PredictPosition(target)
+    local plr = game.Players.LocalPlayer
+    local char = plr.Character
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    local tc = target.Character
+    if not tc then return nil end
+    local tr = tc:FindFirstChild("HumanoidRootPart")
+    if not tr then return nil end
+
+    local dist = (tr.Position - root.Position).Magnitude
+    local speed = 100
+    local pred = Config.Settings.Aimbot.Prediction / 100
+    local travel = dist / speed
+    return tr.Position + (tr.AssemblyLinearVelocity * travel * pred)
+end
+
+function Aimbot.Start()
+    task.spawn(function()
+        while task.wait(0.05) do
+            if Config.Settings.Aimbot.TargetAssist then
+                local target = Aimbot.GetClosestTarget()
+                if target then
+                    currentTarget = target
+                    local predPos = Aimbot.PredictPosition(target)
+                    if predPos then
+                        local cam = workspace.CurrentCamera
+                        if cam then
+                            local goal = CFrame.new(cam.CFrame.Position, predPos)
+                            cam.CFrame = cam.CFrame:Lerp(goal, Config.Settings.Aimbot.Smoothness)
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+function Aimbot.GetTarget() return currentTarget end
+
+--==============================================================
+-- OTHER (Dash / Speed / Jump)
+--==============================================================
+local Other = {}
+
+function Other.SetSpeed(speed)
+    local plr = game.Players.LocalPlayer
+    local char = plr.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then hum.WalkSpeed = speed end
+end
+
+function Other.SetJump(jump)
+    local plr = game.Players.LocalPlayer
+    local char = plr.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then hum.JumpPower = jump; hum.UseJumpPower = true end
+end
+
+function Other.Dash()
+    if not Config.Settings.Other.DashEnabled then return end
+    local plr = game.Players.LocalPlayer
+    local char = plr.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then return end
+    local dir = hum.MoveDirection
+    if dir.Magnitude < 0.1 then dir = root.CFrame.LookVector end
+    Bypass.SafeDash(dir, Config.Settings.Other.Dash)
+end
+
+function Other.TeleportTo(cframe)
+    Bypass.SafeTeleport(cframe, Config.Settings.Bypass.TeleportSteps, Config.Settings.Bypass.TeleportDuration)
+end
+
+function Other.StartAutoApply()
+    task.spawn(function()
+        while task.wait(0.5) do
+            Other.SetSpeed(Config.Settings.Other.MovementSpeed)
+            Other.SetJump(Config.Settings.Other.JumpHeight)
+        end
+    end)
+end
+
+--==============================================================
+-- UI
+--==============================================================
+local UI = {}
+local UIS = game:GetService("UserInputService")
+
+local COLORS = {
+    bg      = Color3.fromRGB(8, 10, 16),
+    panel   = Color3.fromRGB(18, 22, 32),
+    card    = Color3.fromRGB(22, 27, 38),
+    accent  = Color3.fromRGB(0, 170, 255),
+    text    = Color3.fromRGB(235, 238, 245),
+    subtext = Color3.fromRGB(130, 140, 160),
+    off     = Color3.fromRGB(45, 50, 65),
+    success = Color3.fromRGB(0, 230, 120),
+    border  = Color3.fromRGB(35, 42, 58),
+}
+
+local function makeFrame(p) local f = Instance.new("Frame"); f.Active = true; f.BorderSizePixel = 0; for k,v in pairs(p) do f[k]=v end; return f end
+local function makeButton(p) local b = Instance.new("TextButton"); b.Active = true; b.AutoButtonColor = false; b.BorderSizePixel = 0; b.Text = ""; b.Font = Enum.Font.Gotham; for k,v in pairs(p) do b[k]=v end; return b end
+local function makeLabel(p) local l = Instance.new("TextLabel"); l.BackgroundTransparency = 1; l.Font = Enum.Font.Gotham; l.TextColor3 = COLORS.text; l.ZIndex = 2; for k,v in pairs(p) do l[k]=v end; return l end
+local function round(o,r) local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,r or 8); c.Parent = o; return c end
+local function stroke(o,c,t,tr) local s = Instance.new("UIStroke"); s.Color = c or COLORS.border; s.Thickness = t or 1; s.Transparency = tr or 0; s.Parent = o; return s end
+
+function UI.Build()
+    local plr = game.Players.LocalPlayer
+    local pg = plr:WaitForChild("PlayerGui")
+    local old = pg:FindFirstChild("ZpekenoUI")
+    if old then old:Destroy() end
+
+    local screen = Instance.new("ScreenGui")
+    screen.Name = "ZpekenoUI"
+    screen.ResetOnSpawn = false
+    screen.IgnoreGuiInset = true
+    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screen.DisplayOrder = 999
+    screen.Parent = pg
+
+    local function getScale()
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(1920,1080)
+        local isMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
+        local isTablet = UIS.TouchEnabled and UIS.KeyboardEnabled
+        local isPortrait = vp.Y > vp.X
+        if isMobile then return isPortrait and 0.55 or 0.65
+        elseif isTablet then return 0.85
+        else
+            if vp.X < 1366 then return 0.85 end
+            if vp.X < 1920 then return 1.0 end
+            return 1.1
+        end
+    end
+
+    -- botão Z
+    local zBtn = makeButton({
+        Name = "ZButton", Size = UDim2.new(0,52,0,52), Position = UDim2.new(0,18,0,18),
+        BackgroundColor3 = COLORS.bg, Parent = screen, ZIndex = 20,
+    })
+    round(zBtn, 14); stroke(zBtn, COLORS.accent, 2, 0)
+    makeLabel({
+        Text = "Z", Font = Enum.Font.GothamBlack, TextSize = 28, TextColor3 = COLORS.accent,
+        Size = UDim2.new(1,0,1,0), TextXAlignment = Enum.TextXAlignment.Center,
+        TextYAlignment = Enum.TextYAlignment.Center, ZIndex = 21, Parent = zBtn,
+    })
+
+    -- main
+    local main = makeFrame({
+        Name = "Main", Size = UDim2.new(0,800,0,500), Position = UDim2.new(0.5,-400,0.5,-250),
+        BackgroundColor3 = COLORS.bg, Parent = screen, ZIndex = 10,
+    })
+    round(main, 14); stroke(main, COLORS.border, 1, 0.3)
+
+    local uiScale = Instance.new("UIScale")
+    uiScale.Scale = getScale()
+    uiScale.Parent = main
+
+    local cam = workspace.CurrentCamera
+    if cam then
+        cam:GetPropertyChangedSignal("ViewportSize"):Connect(function() uiScale.Scale = getScale() end)
+    end
+    UIS:GetPropertyChangedSignal("TouchEnabled"):Connect(function() uiScale.Scale = getScale() end)
+
+    zBtn.MouseButton1Click:Connect(function() main.Visible = not main.Visible end)
+
+    -- header
+    local header = makeButton({
+        Name = "Header", Size = UDim2.new(1,0,0,56), Position = UDim2.new(0,0,0,0),
+        BackgroundColor3 = COLORS.bg, Parent = main, ZIndex = 11,
+    })
+    round(header, 14)
+
+    makeLabel({Text="Z",Font=Enum.Font.GothamBlack,TextSize=32,TextColor3=COLORS.text,Size=UDim2.new(0,42,1,0),Position=UDim2.new(0,18,0,0),TextYAlignment=Enum.TextYAlignment.Center,ZIndex=12,Parent=header})
+    makeLabel({Text="ZpeKeno",Font=Enum.Font.GothamBold,TextSize=20,TextColor3=COLORS.text,Size=UDim2.new(0,200,0,26),Position=UDim2.new(0,66,0,8),ZIndex=12,Parent=header})
+    makeLabel({Text="GAME DEVELOPMENT HUB",TextSize=10,TextColor3=COLORS.subtext,Size=UDim2.new(0,200,0,14),Position=UDim2.new(0,66,0,32),ZIndex=12,Parent=header})
+    makeLabel({Text="/ BETTER TOOLS\n/ BIGGER IDEAS",TextSize=10,TextColor3=COLORS.subtext,Size=UDim2.new(0,180,0,30),Position=UDim2.new(1,-290,0.5,-15),TextXAlignment=Enum.TextXAlignment.Right,TextYAlignment=Enum.TextYAlignment.Center,ZIndex=12,Parent=header})
+
+    local close = makeButton({
+        Size=UDim2.new(0,32,0,32),Position=UDim2.new(1,-46,0.5,-16),
+        BackgroundColor3=COLORS.panel,Parent=header,ZIndex=13,
+    })
+    round(close,8); stroke(close,COLORS.border,1,0)
+    makeLabel({Text="X",Font=Enum.Font.GothamBold,Size=UDim2.new(1,0,1,0),TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,TextSize=14,ZIndex=14,Parent=close})
+    close.MouseButton1Click:Connect(function() screen.Enabled = false end)
+
+    -- body
+    local body = makeFrame({
+        Name="Body", Size=UDim2.new(1,0,1,-56), Position=UDim2.new(0,0,0,56),
+        BackgroundTransparency=1, Parent=main, ZIndex=11,
+    })
+
+    -- tab bar
+    local tabBar = makeFrame({
+        Size=UDim2.new(1,-24,0,42), Position=UDim2.new(0,12,0,10),
+        BackgroundColor3=COLORS.panel, Parent=body, ZIndex=12,
+    })
+    round(tabBar,10); stroke(tabBar,COLORS.border,1,0.5)
+
+    local contentHolder = makeFrame({
+        Size=UDim2.new(1,-24,1,-74), Position=UDim2.new(0,12,0,62),
+        BackgroundTransparency=1, Parent=body, ZIndex=12,
+    })
+
+    -- status
+    local statusDot = makeFrame({
+        Name="StatusDot", Size=UDim2.new(0,8,0,8), Position=UDim2.new(0,14,1,-22),
+        BackgroundColor3=COLORS.success, Parent=body, ZIndex=15,
+    })
+    round(statusDot,4)
+    makeLabel({Text="System Ready\nv"..Config.Version,TextSize=9,TextColor3=COLORS.subtext,Size=UDim2.new(0,120,0,24),Position=UDim2.new(0,28,1,-30),TextYAlignment=Enum.TextYAlignment.Center,ZIndex=15,Parent=body})
+
+    -- tabs
+    local tabs = {
+        {id="AIMBOT",label="AIMBOT",icon="◎"},
+        {id="VISUAL",label="VISUAL",icon="◉"},
+        {id="OTHER",label="OTHER",icon="⚙"},
+    }
+    local tabButtons = {}
+    local tabContent = {}
+
+    for i, tab in ipairs(tabs) do
+        local btn = makeButton({
+            Name=tab.id, Size=UDim2.new(1/3,-6,1,-8), Position=UDim2.new((i-1)/3,3,0,4),
+            BackgroundColor3=COLORS.panel, Parent=tabBar, ZIndex=13,
+        })
+        round(btn,8); stroke(btn,COLORS.border,1,1)
+
+        local iconLbl = makeLabel({Text=tab.icon,Font=Enum.Font.GothamBold,TextSize=14,TextColor3=COLORS.subtext,Size=UDim2.new(0,24,1,0),Position=UDim2.new(0,10,0,0),TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,ZIndex=14,Parent=btn})
+        local nameLbl = makeLabel({Text=tab.label,Font=Enum.Font.GothamBold,TextSize=13,TextColor3=COLORS.subtext,Size=UDim2.new(1,-34,1,0),Position=UDim2.new(0,34,0,0),TextYAlignment=Enum.TextYAlignment.Center,ZIndex=14,Parent=btn})
+
+        local content = makeFrame({
+            Name=tab.id.."_Content", Size=UDim2.new(1,0,1,0), BackgroundTransparency=1,
+            Visible=(i==1), Parent=contentHolder, ZIndex=13,
+        })
+        tabContent[tab.id] = content
+        tabButtons[tab.id] = {btn=btn, icon=iconLbl, label=nameLbl, stroke=btn:FindFirstChildOfClass("UIStroke")}
+
+        btn.MouseButton1Click:Connect(function()
+            for n, t in pairs(tabContent) do t.Visible = (n == tab.id) end
+            for n, b in pairs(tabButtons) do
+                local active = (n == tab.id)
+                b.btn.BackgroundColor3 = active and COLORS.accent or COLORS.panel
+                b.icon.TextColor3 = active and Color3.fromRGB(255,255,255) or COLORS.subtext
+                b.label.TextColor3 = active and Color3.fromRGB(255,255,255) or COLORS.subtext
+                b.stroke.Transparency = active and 0 or 1
+                b.stroke.Color = active and COLORS.accent or COLORS.border
+            end
+        end)
+    end
+    tabButtons["AIMBOT"].btn.BackgroundColor3 = COLORS.accent
+    tabButtons["AIMBOT"].icon.TextColor3 = Color3.fromRGB(255,255,255)
+    tabButtons["AIMBOT"].label.TextColor3 = Color3.fromRGB(255,255,255)
+    tabButtons["AIMBOT"].stroke.Transparency = 0
+    tabButtons["AIMBOT"].stroke.Color = COLORS.accent
+
+    -- card helper
+    local function makeCard(parent, title, subtitle, icon, widthScale, xPos)
+        local card = makeFrame({
+            Size = widthScale or UDim2.new(1,-8,1,0),
+            Position = xPos or UDim2.new(0,0,0,0),
+            BackgroundColor3 = COLORS.card, Parent = parent, ZIndex = 14,
+        })
+        round(card,10); stroke(card,COLORS.border,1,0.6)
+        makeLabel({Text=(icon or "◆").."  "..title,Font=Enum.Font.GothamBold,TextSize=14,TextColor3=COLORS.text,Size=UDim2.new(1,-20,0,22),Position=UDim2.new(0,12,0,12),ZIndex=15,Parent=card})
+        makeLabel({Text=subtitle or "",TextSize=10,TextColor3=COLORS.subtext,Size=UDim2.new(1,-20,0,14),Position=UDim2.new(0,12,0,
