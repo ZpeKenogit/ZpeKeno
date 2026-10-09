@@ -1,0 +1,778 @@
+--==============================================================
+-- UI (DESIGN ZPEKENO — PC / MOBILE / TABLET)
+--==============================================================
+local UI = {}
+
+local COLORS = {
+    bg        = Color3.fromRGB(8, 10, 16),
+    sidebar   = Color3.fromRGB(12, 15, 22),
+    panel     = Color3.fromRGB(18, 22, 32),
+    card      = Color3.fromRGB(22, 27, 38),
+    accent    = Color3.fromRGB(0, 170, 255),
+    accentDim = Color3.fromRGB(0, 100, 160),
+    text      = Color3.fromRGB(235, 238, 245),
+    subtext   = Color3.fromRGB(130, 140, 160),
+    off       = Color3.fromRGB(45, 50, 65),
+    success   = Color3.fromRGB(0, 230, 120),
+    border    = Color3.fromRGB(35, 42, 58),
+}
+
+local UIS = game:GetService("UserInputService")
+
+local function makeFrame(props)
+    local f = Instance.new("Frame")
+    f.Active = true
+    f.BorderSizePixel = 0
+    f.BackgroundColor3 = COLORS.panel
+    for k, v in pairs(props) do f[k] = v end
+    return f
+end
+
+local function makeButton(props)
+    local b = Instance.new("TextButton")
+    b.Active = true
+    b.AutoButtonColor = false
+    b.BorderSizePixel = 0
+    b.BackgroundColor3 = COLORS.panel
+    b.Text = ""
+    b.Font = Enum.Font.Gotham
+    b.TextColor3 = COLORS.text
+    for k, v in pairs(props) do b[k] = v end
+    return b
+end
+
+local function makeLabel(props)
+    local l = Instance.new("TextLabel")
+    l.BackgroundTransparency = 1
+    l.Font = Enum.Font.Gotham
+    l.TextColor3 = COLORS.text
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.ZIndex = 2
+    for k, v in pairs(props) do l[k] = v end
+    return l
+end
+
+local function round(obj, r)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, r or 8)
+    c.Parent = obj
+    return c
+end
+
+local function stroke(obj, color, thickness, transparency)
+    local s = Instance.new("UIStroke")
+    s.Color = color or COLORS.border
+    s.Thickness = thickness or 1
+    s.Transparency = transparency or 0
+    s.Parent = obj
+    return s
+end
+
+--==============================================================
+-- BUILD
+--==============================================================
+function UI.Build()
+    local plr = game.Players.LocalPlayer
+    local pg = plr:WaitForChild("PlayerGui")
+
+    local old = pg:FindFirstChild("ZpekenoUI")
+    if old then old:Destroy() end
+
+    local screen = Instance.new("ScreenGui")
+    screen.Name = "ZpekenoUI"
+    screen.ResetOnSpawn = false
+    screen.IgnoreGuiInset = true
+    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screen.DisplayOrder = 999
+    screen.Parent = pg
+
+    local function getScale()
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(1920, 1080)
+        local isMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
+        local isTablet = UIS.TouchEnabled and UIS.KeyboardEnabled
+        local isPortrait = vp.Y > vp.X
+        if isMobile then
+            return isPortrait and 0.55 or 0.65
+        elseif isTablet then
+            return 0.85
+        else
+            if vp.X < 1366 then return 0.85 end
+            if vp.X < 1920 then return 1.0 end
+            return 1.1
+        end
+    end
+
+    --== BOTÃO Z FLUTUANTE ==
+    local zBtn = makeButton({
+        Name = "ZButton",
+        Size = UDim2.new(0, 52, 0, 52),
+        Position = UDim2.new(0, 18, 0, 18),
+        BackgroundColor3 = COLORS.bg,
+        Parent = screen,
+        ZIndex = 20,
+    })
+    round(zBtn, 14)
+    stroke(zBtn, COLORS.accent, 2, 0)
+    makeLabel({
+        Text = "Z",
+        Font = Enum.Font.GothamBlack,
+        TextSize = 28,
+        TextColor3 = COLORS.accent,
+        Size = UDim2.new(1, 0, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        ZIndex = 21,
+        Parent = zBtn,
+    })
+
+    --== PAINEL PRINCIPAL ==
+    local main = makeFrame({
+        Name = "Main",
+        Size = UDim2.new(0, 800, 0, 500),
+        Position = UDim2.new(0.5, -400, 0.5, -250),
+        BackgroundColor3 = COLORS.bg,
+        Parent = screen,
+        ZIndex = 10,
+    })
+    round(main, 14)
+    stroke(main, COLORS.border, 1, 0.3)
+
+    local uiScale = Instance.new("UIScale")
+    uiScale.Scale = getScale()
+    uiScale.Parent = main
+
+    local cam = workspace.CurrentCamera
+    if cam then
+        cam:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+            uiScale.Scale = getScale()
+        end)
+    end
+    UIS:GetPropertyChangedSignal("TouchEnabled"):Connect(function()
+        uiScale.Scale = getScale()
+    end)
+
+    zBtn.MouseButton1Click:Connect(function()
+        main.Visible = not main.Visible
+    end)
+
+    --== HEADER ==
+    local header = makeButton({
+        Name = "Header",
+        Size = UDim2.new(1, 0, 0, 56),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = COLORS.bg,
+        Parent = main,
+        ZIndex = 11,
+    })
+    round(header, 14)
+
+    -- logo Z
+    makeLabel({
+        Text = "Z",
+        Font = Enum.Font.GothamBlack,
+        TextSize = 32,
+        TextColor3 = COLORS.text,
+        Size = UDim2.new(0, 42, 1, 0),
+        Position = UDim2.new(0, 18, 0, 0),
+        TextYAlignment = Enum.TextYAlignment.Center,
+        ZIndex = 12,
+        Parent = header,
+    })
+    makeLabel({
+        Text = "ZpeKeno",
+        Font = Enum.Font.GothamBold,
+        TextSize = 20,
+        TextColor3 = COLORS.text,
+        Size = UDim2.new(0, 200, 0, 26),
+        Position = UDim2.new(0, 66, 0, 8),
+        ZIndex = 12,
+        Parent = header,
+    })
+    makeLabel({
+        Text = "GAME DEVELOPMENT HUB",
+        Font = Enum.Font.Gotham,
+        TextSize = 10,
+        TextColor3 = COLORS.subtext,
+        Size = UDim2.new(0, 200, 0, 14),
+        Position = UDim2.new(0, 66, 0, 32),
+        ZIndex = 12,
+        Parent = header,
+    })
+    -- slogan direita
+    makeLabel({
+        Text = "/ BETTER TOOLS\n/ BIGGER IDEAS",
+        Font = Enum.Font.Gotham,
+        TextSize = 10,
+        TextColor3 = COLORS.subtext,
+        Size = UDim2.new(0, 180, 0, 30),
+        Position = UDim2.new(1, -290, 0.5, -15),
+        TextXAlignment = Enum.TextXAlignment.Right,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        ZIndex = 12,
+        Parent = header,
+    })
+
+    -- botão X
+    local close = makeButton({
+        Size = UDim2.new(0, 32, 0, 32),
+        Position = UDim2.new(1, -46, 0.5, -16),
+        BackgroundColor3 = COLORS.panel,
+        Parent = header,
+        ZIndex = 13,
+    })
+    round(close, 8)
+    stroke(close, COLORS.border, 1, 0)
+    makeLabel({
+        Text = "X",
+        Font = Enum.Font.GothamBold,
+        Size = UDim2.new(1, 0, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        TextSize = 14,
+        ZIndex = 14,
+        Parent = close,
+    })
+    close.MouseButton1Click:Connect(function()
+        screen.Enabled = false
+    end)
+
+    --== SIDEBAR ==
+    local sidebar = makeFrame({
+        Name = "Sidebar",
+        Size = UDim2.new(0, 90, 1, -56),
+        Position = UDim2.new(0, 0, 0, 56),
+        BackgroundColor3 = COLORS.sidebar,
+        Parent = main,
+        ZIndex = 11,
+    })
+
+    --== ÁREA DE CONTEÚDO ==
+    local body = makeFrame({
+        Name = "Body",
+        Size = UDim2.new(1, -90, 1, -56),
+        Position = UDim2.new(0, 90, 0, 56),
+        BackgroundTransparency = 1,
+        Parent = main,
+        ZIndex = 11,
+    })
+
+    --== TAB BAR (dentro do body) ==
+    local tabBar = makeFrame({
+        Size = UDim2.new(1, -24, 0, 42),
+        Position = UDim2.new(0, 12, 0, 10),
+        BackgroundColor3 = COLORS.panel,
+        Parent = body,
+        ZIndex = 12,
+    })
+    round(tabBar, 10)
+    stroke(tabBar, COLORS.border, 1, 0.5)
+
+    --== ÁREA DAS 3 COLUNAS ==
+    local contentHolder = makeFrame({
+        Size = UDim2.new(1, -24, 1, -74),
+        Position = UDim2.new(0, 12, 0, 62),
+        BackgroundTransparency = 1,
+        Parent = body,
+        ZIndex = 12,
+    })
+
+    --== STATUS BAR (rodapé esquerdo do body) ==
+    local statusDot = makeFrame({
+        Name = "StatusDot",
+        Size = UDim2.new(0, 8, 0, 8),
+        Position = UDim2.new(0, 14, 1, -22),
+        BackgroundColor3 = COLORS.success,
+        Parent = body,
+        ZIndex = 15,
+    })
+    round(statusDot, 4)
+    makeLabel({
+        Text = "System Ready\nv1.1.0",
+        Font = Enum.Font.Gotham,
+        TextSize = 9,
+        TextColor3 = COLORS.subtext,
+        Size = UDim2.new(0, 120, 0, 24),
+        Position = UDim2.new(0, 28, 1, -30),
+        TextYAlignment = Enum.TextYAlignment.Center,
+        ZIndex = 15,
+        Parent = body,
+    })
+
+    --==========================================================
+    -- TAB SYSTEM
+    --==========================================================
+    local tabs = {
+        { id = "AIMBOT", label = "AIMBOT", icon = "◎" },
+        { id = "VISUAL", label = "VISUAL", icon = "◉" },
+        { id = "OTHER",  label = "OTHER",  icon = "⚙" },
+    }
+    local tabButtons = {}
+    local tabContent = {}
+
+    for i, tab in ipairs(tabs) do
+        local btn = makeButton({
+            Name = tab.id,
+            Size = UDim2.new(1/3, -6, 1, -8),
+            Position = UDim2.new((i-1)/3, 3, 0, 4),
+            BackgroundColor3 = COLORS.panel,
+            Parent = tabBar,
+            ZIndex = 13,
+        })
+        round(btn, 8)
+        stroke(btn, COLORS.border, 1, 1)
+
+        local iconLbl = makeLabel({
+            Text = tab.icon,
+            Font = Enum.Font.GothamBold,
+            TextSize = 14,
+            TextColor3 = COLORS.subtext,
+            Size = UDim2.new(0, 24, 1, 0),
+            Position = UDim2.new(0, 10, 0, 0),
+            TextXAlignment = Enum.TextXAlignment.Center,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            ZIndex = 14,
+            Parent = btn,
+        })
+        local nameLbl = makeLabel({
+            Text = tab.label,
+            Font = Enum.Font.GothamBold,
+            TextSize = 13,
+            TextColor3 = COLORS.subtext,
+            Size = UDim2.new(1, -34, 1, 0),
+            Position = UDim2.new(0, 34, 0, 0),
+            TextYAlignment = Enum.TextYAlignment.Center,
+            ZIndex = 14,
+            Parent = btn,
+        })
+
+        local content = makeFrame({
+            Name = tab.id .. "_Content",
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            Visible = (i == 1),
+            Parent = contentHolder,
+            ZIndex = 13,
+        })
+        tabContent[tab.id] = content
+        tabButtons[tab.id] = { btn = btn, icon = iconLbl, label = nameLbl, stroke = btn:FindFirstChildOfClass("UIStroke") }
+
+        btn.MouseButton1Click:Connect(function()
+            for n, t in pairs(tabContent) do t.Visible = (n == tab.id) end
+            for n, b in pairs(tabButtons) do
+                local active = (n == tab.id)
+                b.btn.BackgroundColor3 = active and COLORS.accent or COLORS.panel
+                b.icon.TextColor3 = active and Color3.fromRGB(255,255,255) or COLORS.subtext
+                b.label.TextColor3 = active and Color3.fromRGB(255,255,255) or COLORS.subtext
+                b.stroke.Transparency = active and 0 or 1
+                b.stroke.Color = active and COLORS.accent or COLORS.border
+            end
+        end)
+    end
+
+    -- ativa AIMBOT por padrão
+    tabButtons["AIMBOT"].btn.BackgroundColor3 = COLORS.accent
+    tabButtons["AIMBOT"].icon.TextColor3 = Color3.fromRGB(255,255,255)
+    tabButtons["AIMBOT"].label.TextColor3 = Color3.fromRGB(255,255,255)
+    tabButtons["AIMBOT"].stroke.Transparency = 0
+    tabButtons["AIMBOT"].stroke.Color = COLORS.accent
+
+    --==========================================================
+    -- CARD HELPER
+    --==========================================================
+    local function makeCard(parent, title, subtitle, icon)
+        local card = makeFrame({
+            Size = UDim2.new(1/3, -8, 1, 0),
+            BackgroundColor3 = COLORS.card,
+            Parent = parent,
+            ZIndex = 14,
+        })
+        round(card, 10)
+        stroke(card, COLORS.border, 1, 0.6)
+
+        -- header do card
+        local titleLbl = makeLabel({
+            Text = (icon or "◆") .. "  " .. title,
+            Font = Enum.Font.GothamBold,
+            TextSize = 14,
+            TextColor3 = COLORS.text,
+            Size = UDim2.new(1, -20, 0, 22),
+            Position = UDim2.new(0, 12, 0, 12),
+            ZIndex = 15,
+            Parent = card,
+        })
+        local subLbl = makeLabel({
+            Text = subtitle or "",
+            Font = Enum.Font.Gotham,
+            TextSize = 10,
+            TextColor3 = COLORS.subtext,
+            Size = UDim2.new(1, -20, 0, 14),
+            Position = UDim2.new(0, 12, 0, 34),
+            ZIndex = 15,
+            Parent = card,
+        })
+
+        -- container de rows
+        local rowHolder = makeFrame({
+            Size = UDim2.new(1, -16, 1, -66),
+            Position = UDim2.new(0, 8, 0, 56),
+            BackgroundTransparency = 1,
+            Parent = card,
+            ZIndex = 15,
+        })
+
+        return rowHolder
+    end
+
+    --==========================================================
+    -- ROW HELPERS
+    --==========================================================
+    local function addToggleRow(parent, labelText, subText, state, callback)
+        local count = 0
+        for _ in pairs(parent:GetChildren()) do count = count + 1 end
+
+        local row = makeButton({
+            Size = UDim2.new(1, 0, 0, 44),
+            BackgroundColor3 = COLORS.card,
+            Position = UDim2.new(0, 0, 0, count * 48),
+            Parent = parent,
+            ZIndex = 16,
+        })
+        round(row, 6)
+
+        makeLabel({
+            Text = labelText,
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = COLORS.text,
+            Size = UDim2.new(1, -70, 0, 16),
+            Position = UDim2.new(0, 10, 0, 6),
+            ZIndex = 17,
+            Parent = row,
+        })
+        if subText then
+            makeLabel({
+                Text = subText,
+                Font = Enum.Font.Gotham,
+                TextSize = 9,
+                TextColor3 = COLORS.subtext,
+                Size = UDim2.new(1, -70, 0, 12),
+                Position = UDim2.new(0, 10, 0, 22),
+                ZIndex = 17,
+                Parent = row,
+            })
+        end
+
+        local sw = makeFrame({
+            Size = UDim2.new(0, 40, 0, 20),
+            Position = UDim2.new(1, -50, 0.5, -10),
+            BackgroundColor3 = state and COLORS.accent or COLORS.off,
+            Parent = row,
+            ZIndex = 17,
+        })
+        round(sw, 10)
+
+        local knob = makeFrame({
+            Size = UDim2.new(0, 16, 0, 16),
+            Position = state and UDim2.new(1, -18, 0, 2) or UDim2.new(0, 2, 0, 2),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            Parent = sw,
+            ZIndex = 18,
+        })
+        round(knob, 8)
+
+        row.MouseButton1Click:Connect(function()
+            state = not state
+            callback(state)
+            sw.BackgroundColor3 = state and COLORS.accent or COLORS.off
+            knob.Position = state and UDim2.new(1, -18, 0, 2) or UDim2.new(0, 2, 0, 2)
+        end)
+    end
+
+    local function addSliderRow(parent, labelText, subText, minVal, maxVal, defaultVal, callback)
+        local count = 0
+        for _ in pairs(parent:GetChildren()) do count = count + 1 end
+
+        local row = makeFrame({
+            Size = UDim2.new(1, 0, 0, 62),
+            BackgroundColor3 = COLORS.card,
+            Position = UDim2.new(0, 0, 0, count * 66),
+            Parent = parent,
+            ZIndex = 16,
+        })
+        round(row, 6)
+
+        makeLabel({
+            Text = labelText,
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = COLORS.text,
+            Size = UDim2.new(0, 160, 0, 16),
+            Position = UDim2.new(0, 10, 0, 6),
+            ZIndex = 17,
+            Parent = row,
+        })
+        if subText then
+            makeLabel({
+                Text = subText,
+                Font = Enum.Font.Gotham,
+                TextSize = 9,
+                TextColor3 = COLORS.subtext,
+                Size = UDim2.new(0, 200, 0, 12),
+                Position = UDim2.new(0, 10, 0, 22),
+                ZIndex = 17,
+                Parent = row,
+            })
+        end
+
+        -- badge do valor atual
+        local badge = makeFrame({
+            Size = UDim2.new(0, 80, 0, 18),
+            Position = UDim2.new(1, -90, 0, 8),
+            BackgroundColor3 = COLORS.panel,
+            Parent = row,
+            ZIndex = 17,
+        })
+        round(badge, 4)
+        stroke(badge, COLORS.border, 1, 0.5)
+        local badgeLbl = makeLabel({
+            Text = defaultVal .. " - " .. maxVal,
+            Font = Enum.Font.GothamBold,
+            TextSize = 10,
+            TextColor3 = COLORS.text,
+            Size = UDim2.new(1, 0, 1, 0),
+            TextXAlignment = Enum.TextXAlignment.Center,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            ZIndex = 18,
+            Parent = badge,
+        })
+
+        -- track
+        local track = makeFrame({
+            Size = UDim2.new(1, -20, 0, 6),
+            Position = UDim2.new(0, 10, 0, 42),
+            BackgroundColor3 = COLORS.off,
+            Parent = row,
+            ZIndex = 17,
+        })
+        round(track, 3)
+
+        local fill = makeFrame({
+            Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0),
+            BackgroundColor3 = COLORS.accent,
+            Parent = track,
+            ZIndex = 18,
+        })
+        round(fill, 3)
+
+        local thumb = makeFrame({
+            Size = UDim2.new(0, 14, 0, 14),
+            Position = UDim2.new((defaultVal - minVal) / (maxVal - minVal), -7, 0.5, -7),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            Parent = track,
+            ZIndex = 19,
+        })
+        round(thumb, 7)
+
+        makeLabel({
+            Text = tostring(minVal),
+            Font = Enum.Font.Gotham,
+            TextSize = 9,
+            TextColor3 = COLORS.subtext,
+            Size = UDim2.new(0, 30, 0, 12),
+            Position = UDim2.new(0, 10, 0, 50),
+            ZIndex = 17,
+            Parent = row,
+        })
+        makeLabel({
+            Text = tostring(maxVal),
+            Font = Enum.Font.Gotham,
+            TextSize = 9,
+            TextColor3 = COLORS.subtext,
+            Size = UDim2.new(0, 30, 0, 12),
+            Position = UDim2.new(1, -40, 0, 50),
+            TextXAlignment = Enum.TextXAlignment.Right,
+            ZIndex = 17,
+            Parent = row,
+        })
+
+        -- drag do slider
+        local dragging = false
+        local function updateSlider(input)
+            local trackAbs = track.AbsolutePosition
+            local trackSize = track.AbsoluteSize
+            local rel = math.clamp((input.Position.X - trackAbs.X) / trackSize.X, 0, 1)
+            local val = math.floor(minVal + (maxVal - minVal) * rel)
+            fill.Size = UDim2.new(rel, 0, 1, 0)
+            thumb.Position = UDim2.new(rel, -7, 0.5, -7)
+            badgeLbl.Text = val .. " - " .. maxVal
+            callback(val)
+        end
+
+        track.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+               or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                updateSlider(input)
+            end
+        end)
+        UIS.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+               or input.UserInputType == Enum.UserInputType.Touch) then
+                updateSlider(input)
+            end
+        end)
+        UIS.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+               or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+    end
+
+    --==========================================================
+    -- AIMBOT TAB (3 colunas: Aimbot | Visual | Other — igual imagem 1)
+    --==========================================================
+    local aimContent = tabContent["AIMBOT"]
+
+    -- coluna 1 — AIMBOT
+    local col1 = makeCard(aimContent, "AIMBOT", "Target assistance and smart tracking.", "◎")
+    col1.Parent.Size = UDim2.new(1/3, -8, 1, 0)
+    col1.Parent.Position = UDim2.new(0, 0, 0, 0)
+
+    addToggleRow(col1, "Target Assist", "Auto lock and follow target.", Config.Settings.Aimbot.TargetAssist, function(v)
+        Config.Settings.Aimbot.TargetAssist = v
+    end)
+    addSliderRow(col1, "Target Distance", "Range to find targets.", 100, 1000, 500, function(v)
+        Config.Settings.Aimbot.TargetDistance.max = v
+    end)
+    addSliderRow(col1, "Prediction", "Adjusts target prediction.", 1, 100, 50, function(v)
+        Config.Settings.Aimbot.Prediction = v
+    end)
+    addToggleRow(col1, "Team Filter", "Ignore allies and focus on enemies.", Config.Settings.Aimbot.TeamFilter, function(v)
+        Config.Settings.Aimbot.TeamFilter = v
+    end)
+
+    -- coluna 2 — VISUAL
+    local col2 = makeCard(aimContent, "VISUAL", "Player information and highlighting.", "◉")
+    col2.Parent.Size = UDim2.new(1/3, -8, 1, 0)
+    col2.Parent.Position = UDim2.new(1/3, 4, 0, 0)
+
+    addToggleRow(col2, "Player Outline", "Show outline for valid players.", Config.Settings.Visual.PlayerOutline, function(v)
+        Config.Settings.Visual.PlayerOutline = v
+    end)
+    addToggleRow(col2, "Health %", "Display player health percentage.", Config.Settings.Visual.HealthPercent, function(v)
+        Config.Settings.Visual.HealthPercent = v
+    end)
+    addToggleRow(col2, "Distance", "Show distance to players.", Config.Settings.Visual.Distance, function(v)
+        Config.Settings.Visual.Distance = v
+    end)
+    addToggleRow(col2, "Exclude Local Player", "Don't show your own character.", Config.Settings.Visual.ExcludeLocal, function(v)
+        Config.Settings.Visual.ExcludeLocal = v
+    end)
+
+    -- coluna 3 — OTHER
+    local col3 = makeCard(aimContent, "OTHER", "Character and movement adjustments.", "⚙")
+    col3.Parent.Size = UDim2.new(1/3, -8, 1, 0)
+    col3.Parent.Position = UDim2.new(2/3, 8, 0, 0)
+
+    addSliderRow(col3, "Dash", "Increase dash distance/speed.", 5, 50, Config.Settings.Other.Dash, function(v)
+        Config.Settings.Other.Dash = v
+    end)
+    addSliderRow(col3, "Movement Speed", "Adjust player movement speed.", 5, 100, Config.Settings.Other.MovementSpeed, function(v)
+        Config.Settings.Other.MovementSpeed = v
+    end)
+    addSliderRow(col3, "Jump Height", "Increase jump height.", 5, 50, Config.Settings.Other.JumpHeight, function(v)
+        Config.Settings.Other.JumpHeight = v
+    end)
+
+    --==========================================================
+    -- VISUAL TAB (mesma coisa, mas só VISUAL expandido)
+    --==========================================================
+    local visContent = tabContent["VISUAL"]
+    local visCol = makeCard(visContent, "VISUAL", "Player information and highlighting.", "◉")
+    visCol.Parent.Size = UDim2.new(1, 0, 1, 0)
+    visCol.Parent.Position = UDim2.new(0, 0, 0, 0)
+
+    addToggleRow(visCol, "Player Outline", "Show outline for valid players.", Config.Settings.Visual.PlayerOutline, function(v)
+        Config.Settings.Visual.PlayerOutline = v
+    end)
+    addToggleRow(visCol, "Health %", "Display player health percentage.", Config.Settings.Visual.HealthPercent, function(v)
+        Config.Settings.Visual.HealthPercent = v
+    end)
+    addToggleRow(visCol, "Distance", "Show distance to players.", Config.Settings.Visual.Distance, function(v)
+        Config.Settings.Visual.Distance = v
+    end)
+    addToggleRow(visCol, "Exclude Local Player", "Don't show your own character.", Config.Settings.Visual.ExcludeLocal, function(v)
+        Config.Settings.Visual.ExcludeLocal = v
+    end)
+
+    --==========================================================
+    -- OTHER TAB (expandido)
+    --==========================================================
+    local otherContent = tabContent["OTHER"]
+    local otherCol = makeCard(otherContent, "OTHER", "Character and movement adjustments.", "⚙")
+    otherCol.Parent.Size = UDim2.new(1, 0, 1, 0)
+    otherCol.Parent.Position = UDim2.new(0, 0, 0, 0)
+
+    addToggleRow(otherCol, "Dash Enabled", "Toggle dash on/off.", Config.Settings.Other.DashEnabled, function(v)
+        Config.Settings.Other.DashEnabled = v
+    end)
+    addSliderRow(otherCol, "Dash", "Increase dash distance/speed.", 5, 50, Config.Settings.Other.Dash, function(v)
+        Config.Settings.Other.Dash = v
+    end)
+    addSliderRow(otherCol, "Movement Speed", "Adjust player movement speed.", 5, 100, Config.Settings.Other.MovementSpeed, function(v)
+        Config.Settings.Other.MovementSpeed = v
+    end)
+    addSliderRow(otherCol, "Jump Height", "Increase jump height.", 5, 50, Config.Settings.Other.JumpHeight, function(v)
+        Config.Settings.Other.JumpHeight = v
+    end)
+
+    --==========================================================
+    -- DRAG (funciona em PC e mobile)
+    --==========================================================
+    local dragging, dragStart, startPos
+    local function beginDrag(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+           or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = main.Position
+        end
+    end
+    local function updateDrag(input)
+        if not dragging then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement
+           and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+    local function endDrag(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+           or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end
+
+    header.InputBegan:Connect(beginDrag)
+    header.InputChanged:Connect(updateDrag)
+    header.InputEnded:Connect(endDrag)
+    UIS.InputChanged:Connect(updateDrag)
+    UIS.InputEnded:Connect(endDrag)
+
+    -- centraliza
+    local cam2 = workspace.CurrentCamera
+    if cam2 then
+        local vp = cam2.ViewportSize
+        local scale = getScale()
+        local w = 800 * scale
+        local h = 500 * scale
+        main.Position = UDim2.new(0, math.max(10, (vp.X - w) / 2), 0, math.max(10, (vp.Y - h) / 2))
+    end
+
+    print("[Zpekeno] UI carregada.")
+    return screen
+end
